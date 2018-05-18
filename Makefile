@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-I../libs/mavlink/include/mavlink/v1.0/common -g -ggdb
+CFLAGS=-Imavlink/common -g -ggdb
 LDFLAGS=-lm
 
 mavlink_udp: mavlink_udp.o
