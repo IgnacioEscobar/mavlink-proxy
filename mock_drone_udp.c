@@ -39,7 +39,6 @@
 #include <fcntl.h>
 #include <time.h>
 #include <math.h>
-#include <netdb.h>
 #if (defined __QNX__) | (defined __QNXNTO__)
 /* QNX specific headers */
 #include <unix.h>
@@ -70,12 +69,18 @@ int sock;
 
 MAV_AUTOPILOT _firmwareType = MAV_AUTOPILOT_GENERIC;
 
-int socketfd;
-
 int main(int argc, char* argv[])
 {
+
+	char help[] = "--help";
+
+
+	char target_ip[100];
+
 	float position[6] = {};
+	sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	struct sockaddr_in locAddr;
+	//struct sockaddr_in fromAddr;
 	uint8_t buf[BUFFER_LENGTH];
 	ssize_t recsize;
 	socklen_t fromlen;
@@ -83,20 +88,14 @@ int main(int argc, char* argv[])
 	mavlink_message_t msg;
 	uint16_t len;
 	int i = 0;
+	//int success = 0;
 	unsigned int temp = 0;
   unsigned int ticks = 60;
   float param = 0.0;
 
-  int status;
-  struct addrinfo hints;
-  struct addrinfo *info;
-
-  /**************/
-  /* Usabilidad */
-
 	// Check if --help flag was used
-  char help[] = "--help";
-	if ((argc == 2) && (strcmp(argv[1], help) == 0)){
+	if ((argc == 2) && (strcmp(argv[1], help) == 0))
+    {
 		printf("\n");
 		printf("\tUso:\n\n");
 		printf("\t");
@@ -104,111 +103,110 @@ int main(int argc, char* argv[])
 		printf(" <ip de la base>\n");
 		printf("\tDefault for localhost: udp-server 127.0.0.1\n\n");
 		exit(EXIT_FAILURE);
-  }
+    }
 
 
 	// Change the target ip if parameter was given
-  char targetIP[100];
-	strcpy(targetIP, "127.0.0.1");
-	if (argc == 2){
-		strcpy(targetIP, argv[1]);
-  }
+	strcpy(target_ip, "127.0.0.1");
+	if (argc == 2)
+    {
+		strcpy(target_ip, argv[1]);
+    }
 
-  /*************************/
-  /* Crear el socket local */
 
-  memset(&hints, 0, sizeof hints); // make sure the struct is empty
-  hints.ai_family = AF_UNSPEC;     // don't care IPv4 or IPv6
-  hints.ai_socktype = SOCK_STREAM; // TCP stream sockets
+	memset(&locAddr, 0, sizeof(locAddr));
+	locAddr.sin_family = AF_INET;
+	locAddr.sin_addr.s_addr = INADDR_ANY;
+	locAddr.sin_port = htons(14551);
 
-  char targetPort[] = "14550";
-  if ((status = getaddrinfo(targetIP, targetPort , &hints, &info)) != 0) {
-      fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
-      exit(1);
-  }
+	/* Bind the socket to port 14551 - necessary to receive packets from qgroundcontrol */
+	if (-1 == bind(sock,(struct sockaddr *)&locAddr, sizeof(struct sockaddr)))
+    {
+		perror("error bind failed");
+		close(sock);
+		exit(EXIT_FAILURE);
+    }
 
-  socketfd = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
+	/* Attempt to make it non blocking */
+	if (fcntl(sock, F_SETFL, O_NONBLOCK | FASYNC) < 0)
+    {
+		fprintf(stderr, "error setting nonblocking: %s\n", strerror(errno));
+		close(sock);
+		exit(EXIT_FAILURE);
+    }
 
-  /* Lose the pesky "Address already in use" error message */
-  int yes=1;
-  if (setsockopt(socketfd,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof yes) == -1) {
-      perror("setsockopt");
-      exit(1);
-  }
 
-  /* Conectarse */
-  if (connect(socketfd, info->ai_addr, info->ai_addrlen) == -1) {
-      close(socketfd);
-      perror("connect");
-      exit(1);
-  }
+	memset(&gcAddr, 0, sizeof(gcAddr));
+	gcAddr.sin_family = AF_INET;
+	gcAddr.sin_addr.s_addr = inet_addr(target_ip);
+	gcAddr.sin_port = htons(14550);
 
-  freeaddrinfo(info);
+
 
 	for (;;)
-  {
-        if(ticks == 60)
         {
-            ticks = 0;
+                if(ticks == 60)
+                {
+                    ticks = 0;
 
-            /*Send Heartbeat */
-            mavlink_msg_heartbeat_pack(1, 200, &msg, MAV_TYPE_HELICOPTER, MAV_AUTOPILOT_GENERIC, _mavBaseMode, 0, MAV_STATE_STANDBY);
-            len = mavlink_msg_to_send_buffer(buf, &msg);
-            bytes_sent = send(socketfd, buf, len, 0);
+                    /*Send Heartbeat */
+                    mavlink_msg_heartbeat_pack(1, 200, &msg, MAV_TYPE_HELICOPTER, MAV_AUTOPILOT_PX4, _mavBaseMode, 0, MAV_STATE_STANDBY);
+                    len = mavlink_msg_to_send_buffer(buf, &msg);
+                    bytes_sent = sendto(sock, buf, len, 0, (struct sockaddr*)&gcAddr, sizeof(struct sockaddr_in));
 
-            /* Send Status */
-            mavlink_msg_sys_status_pack(1, 200, &msg, 0, 0, 0, 500, 11000, -1, -1, 0, 0, 0, 0, 0, 0);
-            len = mavlink_msg_to_send_buffer(buf, &msg);
-            bytes_sent = send(socketfd, buf, len, 0);
+                    /* Send Status */
+                    mavlink_msg_sys_status_pack(1, 200, &msg, 0, 0, 0, 500, 11000, -1, -1, 0, 0, 0, 0, 0, 0);
+                    len = mavlink_msg_to_send_buffer(buf, &msg);
+                    bytes_sent = sendto(sock, buf, len, 0, (struct sockaddr*)&gcAddr, sizeof (struct sockaddr_in));
 
-            /* Send Local Position */
-            mavlink_msg_local_position_ned_pack(1, 200, &msg, microsSinceEpoch(),
-                                                                            position[0], position[1], position[2],
-                                                                            position[3], position[4], position[5]);
-            len = mavlink_msg_to_send_buffer(buf, &msg);
-            bytes_sent = send(socketfd, buf, len, 0);
+                    /* Send Local Position */
+                    mavlink_msg_local_position_ned_pack(1, 200, &msg, microsSinceEpoch(),
+                                                                                    position[0], position[1], position[2],
+                                                                                    position[3], position[4], position[5]);
+                    len = mavlink_msg_to_send_buffer(buf, &msg);
+                    bytes_sent = sendto(sock, buf, len, 0, (struct sockaddr*)&gcAddr, sizeof(struct sockaddr_in));
 
-            /* Send attitude */
-            mavlink_msg_attitude_pack(1, 200, &msg, microsSinceEpoch(), 1.2, 1.7, 3.14, 0.01, 0.02, 0.03);
-            len = mavlink_msg_to_send_buffer(buf, &msg);
-            bytes_sent = send(socketfd, buf, len, 0);
+                    /* Send attitude */
+                    mavlink_msg_attitude_pack(1, 200, &msg, microsSinceEpoch(), 1.2, 1.7, 3.14, 0.01, 0.02, 0.03);
+                    len = mavlink_msg_to_send_buffer(buf, &msg);
+                    bytes_sent = sendto(sock, buf, len, 0, (struct sockaddr*)&gcAddr, sizeof(struct sockaddr_in));
 
-            memset(buf, 0, BUFFER_LENGTH);
-            recsize = recv(socketfd, (void *)buf, BUFFER_LENGTH, 0);
-            if (recsize > 0)
-            {
-                    // Something received - print out all bytes and parse packet
-                    mavlink_message_t msg;
-                    mavlink_status_t status;
-
-                    printf("Bytes Received: %d\nDatagram: ", (int)recsize);
-                    for (i = 0; i < recsize; ++i)
+                    memset(buf, 0, BUFFER_LENGTH);
+                    recsize = recvfrom(sock, (void *)buf, BUFFER_LENGTH, 0, (struct sockaddr *)&gcAddr, &fromlen);
+                    if (recsize > 0)
                     {
-                            temp = buf[i];
-                            printf("%02x ", (unsigned char)temp);
-                            if (mavlink_parse_char(MAVLINK_COMM_0, buf[i], &msg, &status))
+                            // Something received - print out all bytes and parse packet
+                            mavlink_message_t msg;
+                            mavlink_status_t status;
+
+                            printf("Bytes Received: %d\nDatagram: ", (int)recsize);
+                            for (i = 0; i < recsize; ++i)
                             {
-                                    // Packet received
-                                    printf("\nReceived packet: SYS: %d, COMP: %d, LEN: %d, MSG ID: %d\n", msg.sysid, msg.compid, msg.len, msg.msgid);
-
-                                    switch(msg.msgid)
+                                    temp = buf[i];
+                                    printf("%02x ", (unsigned char)temp);
+                                    if (mavlink_parse_char(MAVLINK_COMM_0, buf[i], &msg, &status))
                                     {
-                                        case MAVLINK_MSG_ID_SET_MODE:
-                                            setearModo(&msg);
-                                            break;
+                                            // Packet received
+                                            printf("\nReceived packet: SYS: %d, COMP: %d, LEN: %d, MSG ID: %d\n", msg.sysid, msg.compid, msg.len, msg.msgid);
 
-                                        case MAVLINK_MSG_ID_COMMAND_LONG:
-                                            handleCommandLong(&msg);
+                                            switch(msg.msgid)
+                                            {
+                                                case MAVLINK_MSG_ID_SET_MODE:
+                                                    setearModo(&msg);
+                                                    break;
 
-                                        default:
-                                            break;
+                                                case MAVLINK_MSG_ID_COMMAND_LONG:
+                                                    handleCommandLong(&msg);
+
+                                                default:
+                                                    break;
+                                            }
                                     }
                             }
+                            printf("\n");
                     }
-                    printf("\n");
-            }
-            memset(buf, 0, BUFFER_LENGTH);
-        }
+                    memset(buf, 0, BUFFER_LENGTH);
+                }
 
                 /* Enviamos información del GPS 60 veces por segundo, solamente si está armed */
 		if(_mavBaseMode & MAV_MODE_FLAG_SAFETY_ARMED)
@@ -226,12 +224,12 @@ int main(int argc, char* argv[])
 				    UINT16_MAX,                            // course over ground not known
 				    8);                                    // satellite count
 		    len = mavlink_msg_to_send_buffer(buf, &msg);
-		    bytes_sent = send(socketfd, buf, len, 0);
+		    bytes_sent = sendto(sock, buf, len, 0, (struct sockaddr*)&gcAddr, sizeof(struct sockaddr_in));
 
 		    /* Send attitude */
 		    mavlink_msg_attitude_pack(1, 200, &msg, microsSinceEpoch(), 0.0, 0.0, -param, 0.01, 0.02, 0.03);
 		    len = mavlink_msg_to_send_buffer(buf, &msg);
-		    bytes_sent = send(socketfd, buf, len, 0);
+		    bytes_sent = sendto(sock, buf, len, 0, (struct sockaddr*)&gcAddr, sizeof(struct sockaddr_in));
 
 		    param += 2*M_PI/600;    // Trayectoria circular de período de 10 segundos
 
@@ -294,7 +292,7 @@ void handleCommandLong(const mavlink_message_t *msg)
                                  commandResult);
 
     len = mavlink_msg_to_send_buffer(buf, &commandAck);
-    bytes_sent = send(socketfd, buf, len, 0);
+    bytes_sent = sendto(sock, buf, len, 0, (struct sockaddr*)&gcAddr, sizeof (struct sockaddr_in));
 }
 
 void respondWithAutopilotVersion(void)
@@ -334,7 +332,7 @@ void respondWithAutopilotVersion(void)
                                        0);                              // uid
 
     len = mavlink_msg_to_send_buffer(buf, &msg);
-    bytes_sent = send(socketfd, buf, len, 0);
+    bytes_sent = sendto(sock, buf, len, 0, (struct sockaddr*)&gcAddr, sizeof (struct sockaddr_in));
 }
 
 /* QNX timer version */

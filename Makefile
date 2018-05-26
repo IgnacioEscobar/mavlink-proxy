@@ -1,11 +1,11 @@
-CC=gcc
-CFLAGS=-Imavlink/common -g -ggdb
-LDFLAGS=-lm
+CC = gcc
+CFLAGS = -Imavlink/common -g -ggdb
+LDFLAGS = -lm
 
-mavlink_udp: mavlink_udp.o
-	$(CC) -o mavlink_udp mavlink_udp.o $(CFLAGS) $(LDFLAGS)
+mock: mock_drone_tcp.o
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
 .PHONY: clean
 
 clean:
-	rm -f mavlink_udp mavlink_udp.o
+	rm -f mock_drone_tcp.o mock
