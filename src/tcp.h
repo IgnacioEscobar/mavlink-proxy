@@ -4,8 +4,8 @@
  Descripcion   : Funciones basicas de sockets tcp
  ============================================================================
  */
-#ifndef UTILITIES_SOCKET_UTILS_H_
-#define UTILITIES_SOCKET_UTILS_H_
+#ifndef TCP_H_
+#define TCP_H_
 
 /*
  ============================================================================
@@ -45,4 +45,4 @@ int crear_listener(const char* puerto);
 */
 int escuchar_socket(const int listenerSocket, const int backlog);
 
-#endif /* UTILITIES_SOCKET_UTILS_H_ */
+#endif /* TCP_H_ */
