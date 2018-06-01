@@ -6,7 +6,7 @@ Aplicaciones que simulan a un dron, enviando mensajes mavlink de heartbeat y tel
 Compilacion simplemente con el comando make (en la carpeta mock)
 ``` bash
 # Para compilar la version UDP
-make TCP
+make udp
 # Para compilar la version TCP
 make tcp
 ```
