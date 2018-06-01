@@ -2,10 +2,10 @@ CC = gcc
 CFLAGS = -I../mavlink/common -g -ggdb
 LDFLAGS = -lm
 
-tcp: mock_drone_tcp.o
+tcpClient: mock_drone_tcp_client.o tcp.o
 	$(CC) -o $@Mock $^ $(CFLAGS) $(LDFLAGS)
 
-tcpClient: mock_drone_tcp_client.o tcp.o
+tcpServer: mock_drone_tcp.o
 	$(CC) -o $@Mock $^ $(CFLAGS) $(LDFLAGS)
 
 udp: mock_drone_tcp.o
