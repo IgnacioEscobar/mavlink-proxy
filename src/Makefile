@@ -1,8 +1,8 @@
 CC = gcc
 CFLAGS = -I -g -ggdb
 
-build: main.c tcp.c droneServer.c
-	$(CC) -o App main.c tcp.c droneServer.c $(CFLAGS)
+build: main.c tcp.c droneServer.c behavior.c
+	$(CC) -o App main.c tcp.c droneServer.c behavior.c $(CFLAGS)
 
 .PHONY: clean
 

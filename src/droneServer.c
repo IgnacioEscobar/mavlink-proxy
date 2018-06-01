@@ -10,7 +10,7 @@
 
 #define BACKLOG 100
 
-void init_droneServer(const char* puertoEscucha){
+void init_droneServer(const char* puertoEscucha, void (*encargado)(int)){
 
   	// Recibir conexion
   	int listener = crear_listener(puertoEscucha);
@@ -56,14 +56,8 @@ void init_droneServer(const char* puertoEscucha){
 								fdmax = nuevoCliente;
 								}
 						}
-					} else { // Escuchar mensaje
-            //////////////////////////////////////
-            //////////////////////////////////////
-            //////////////////////////////////////
-            //////    Logica del proxy   /////////
-            //////////////////////////////////////
-            //////////////////////////////////////
-            //////////////////////////////////////
+					} else { // Envio el socket < i > a la funcion encargado
+              encargado(i); // Funcion que se encargara de manejar la conexion
 					}
 				}
 			}

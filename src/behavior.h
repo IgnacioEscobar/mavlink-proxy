@@ -1,19 +1,20 @@
 /*
  ============================================================================
- Nombre        : droneServer.h
+ Nombre        : behavior.h
  Descripcion   :
  ============================================================================
  */
-#ifndef DRONE_SERVER_H_
-#define DRONE_SERVER_H_
+ 
+#ifndef BEHAVIOR_H_
+#define BEHAVIOR_H_
 
 /*
  ============================================================================
- Crea un servidor multiplexado en el puerto dado
+ Behavior basico
  ============================================================================
 */
-void init_droneServer(const char* puertoEscucha, void (*encargado)(int socketEncargo));
+void pasajeBasico(int socketDron);
 
 
 
-#endif /* DRONE_SERVER_H_ */
+#endif /* BEHAVIOR_H_ */
