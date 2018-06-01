@@ -6,6 +6,8 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
+#include "tcp.h"
+
 #define BACKLOG 100
 
 void init_droneServer(const char* puertoEscucha){
@@ -18,7 +20,6 @@ void init_droneServer(const char* puertoEscucha){
 		int i,fdmax,nuevoCliente;
     socklen_t addrlen;
     struct sockaddr_storage remoteaddr;
-	  HEADER_T header;
 
 		//Escuchar listener
 		if(listen(listener,backlog)==-1){
@@ -54,8 +55,6 @@ void init_droneServer(const char* puertoEscucha){
 							if (nuevoCliente > fdmax) {
 								fdmax = nuevoCliente;
 								}
-							log_trace(logYAMA, "Se conecto Master %d", idUltimoMasterCreado);
-							agregarAListado(nuevoCliente);
 						}
 					} else { // Escuchar mensaje
             //////////////////////////////////////
